@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  cursor-session-manager:
+    build: .
+    container_name: cursor-session-manager
+    image: cursor-session-manager:latest
+    
+    # 端口映射 - 公网访问
+    ports:
+      - "0.0.0.0:8899:8080"  # 映射到主机的 8899 端口
+    
+    # 环境变量
+    environment:
+      - PYTHONUNBUFFERED=1
+    
+    # 挂载卷 - 访问主机的 Cursor 数据
+    volumes:
+      - ${HOME}/.cursor:/root/.cursor:ro  # 只读访问 Cursor 配置
+      - ${HOME}/cursor-session-manager/saved_sessions:/root/cursor-session-manager/saved_sessions  # 会话存储
+    
+    # 重启策略
+    restart: unless-stopped
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # 网络模式
+    network_mode: bridge
+
+networks:
+  default:
+    driver: bridge
