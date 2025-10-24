@@ -1133,21 +1133,29 @@
         let autoSaveEnabled = false;
         let autoSaveTimer = null;
         let autoSaveInterval = 1; // 默认1分钟
+        let autoSaveKeepCount = 3; // 默认保留3个
 
         // 初始化自动保存设置
         function initAutoSave() {
             const savedEnabled = localStorage.getItem('autoSaveEnabled');
             const savedInterval = localStorage.getItem('autoSaveInterval');
+            const savedKeepCount = localStorage.getItem('autoSaveKeepCount');
             
             if (savedEnabled === 'true') {
                 autoSaveEnabled = true;
                 document.getElementById('autoSaveToggle').checked = true;
                 document.getElementById('autoSaveIntervalContainer').style.display = 'block';
+                document.getElementById('autoSaveKeepContainer').style.display = 'block';
             }
             
             if (savedInterval) {
                 autoSaveInterval = parseFloat(savedInterval);
                 document.getElementById('autoSaveInterval').value = savedInterval;
+            }
+            
+            if (savedKeepCount) {
+                autoSaveKeepCount = parseInt(savedKeepCount);
+                document.getElementById('autoSaveKeepCount').value = savedKeepCount;
             }
             
             updateAutoSaveStatus();
@@ -1164,15 +1172,24 @@
             
             if (autoSaveEnabled) {
                 document.getElementById('autoSaveIntervalContainer').style.display = 'block';
+                document.getElementById('autoSaveKeepContainer').style.display = 'block';
                 startAutoSave();
-                showNotification('✅ 自动保存已开启', 'success');
+                showNotification(`✅ 自动保存已开启（保留最近${autoSaveKeepCount}个）`, 'success');
             } else {
                 document.getElementById('autoSaveIntervalContainer').style.display = 'none';
+                document.getElementById('autoSaveKeepContainer').style.display = 'none';
                 stopAutoSave();
                 showNotification('⚠️ 自动保存已关闭', 'success');
             }
             
             updateAutoSaveStatus();
+        }
+        
+        // 更新保留数量
+        function updateKeepCount() {
+            autoSaveKeepCount = parseInt(document.getElementById('autoSaveKeepCount').value);
+            localStorage.setItem('autoSaveKeepCount', autoSaveKeepCount);
+            showNotification(`✅ 已设置保留最近 ${autoSaveKeepCount} 个自动保存`, 'success');
         }
 
         // 更新自动保存间隔
@@ -1245,9 +1262,9 @@
             if (!autoSaveEnabled) return;
             
             try {
-                console.log('执行自动保存...');
+                console.log(`执行自动保存（保留最近${autoSaveKeepCount}个）...`);
                 
-                const response = await fetch(`${API_BASE}/sessions/auto-save`, {
+                const response = await fetch(`${API_BASE}/sessions/auto-save?max_keep=${autoSaveKeepCount}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });

@@ -167,7 +167,7 @@ async def list_sessions(project: Optional[str] = None):
     return all_sessions
 
 @app.post("/api/sessions/auto-save")
-async def auto_save_session():
+async def auto_save_session(max_keep: int = 3):
     """自动保存当前会话"""
     current_db, hash_folder = find_current_session_db()
     
@@ -262,12 +262,65 @@ async def auto_save_session():
     with open(meta_file, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
     
+    # 清理旧的自动保存（只保留最近的 max_keep 个）
+    cleanup_old_auto_saves(project_sessions_dir, max_keep)
+    
     return {
         "status": "success",
         "message": "自动保存成功",
         "session_id": timestamp,
         "name": session_name
     }
+
+def cleanup_old_auto_saves(project_dir: Path, max_keep: int):
+    """清理旧的自动保存，只保留最近的 max_keep 个
+    
+    Args:
+        project_dir: 项目会话目录
+        max_keep: 保留的自动保存数量
+    """
+    try:
+        # 获取所有自动保存的会话
+        auto_save_sessions = []
+        for meta_file in project_dir.glob("*.meta.json"):
+            try:
+                with open(meta_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    # 只处理自动保存的会话
+                    if metadata.get('auto_saved', False):
+                        auto_save_sessions.append({
+                            'meta_file': meta_file,
+                            'metadata': metadata,
+                            'mtime': meta_file.stat().st_mtime
+                        })
+            except:
+                continue
+        
+        # 按时间倒序排列
+        auto_save_sessions.sort(key=lambda x: x['mtime'], reverse=True)
+        
+        # 删除超出数量的旧会话
+        if len(auto_save_sessions) > max_keep:
+            for session in auto_save_sessions[max_keep:]:
+                try:
+                    # 删除 meta.json
+                    session['meta_file'].unlink()
+                    
+                    # 删除 .db 文件
+                    db_file = project_dir / session['metadata']['db_file']
+                    if db_file.exists():
+                        db_file.unlink()
+                    
+                    # 删除 .json 文件
+                    json_file = project_dir / session['metadata']['json_file']
+                    if json_file.exists():
+                        json_file.unlink()
+                    
+                    print(f"已清理旧会话: {session['metadata']['name']}")
+                except Exception as e:
+                    print(f"清理会话失败: {e}")
+    except Exception as e:
+        print(f"清理旧会话时出错: {e}")
 
 @app.post("/api/sessions/save")
 async def save_session(session_save: SessionSave):
